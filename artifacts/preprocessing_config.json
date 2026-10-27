@@ -1,0 +1,46 @@
+{
+  "channels": [
+    "EEG Fpz-Cz"
+  ],
+  "sampling_rate_hz": 100,
+  "bandpass_hz": [
+    0.3,
+    35.0
+  ],
+  "filter_order": 4,
+  "epoch_length_sec": 30,
+  "welch": {
+    "window_sec": 4,
+    "overlap": 0.5
+  },
+  "bands_hz": {
+    "delta": [
+      0.5,
+      4.0
+    ],
+    "theta": [
+      4.0,
+      8.0
+    ],
+    "alpha": [
+      8.0,
+      13.0
+    ],
+    "beta": [
+      13.0,
+      30.0
+    ]
+  },
+  "total_power_range_hz": [
+    0.5,
+    30.0
+  ],
+  "min_duration_epochs": 10,
+  "wake_margin_min": 30,
+  "quality": {
+    "flat_std_uv": 1.0,
+    "max_abs_uv": 196.57752670442977
+  },
+  "normalize_per_recording": true,
+  "context_epochs": true
+}

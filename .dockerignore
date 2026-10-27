@@ -1,0 +1,10 @@
+data/
+cache/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.ipynb_checkpoints/
+.env
+.venv
+*.md

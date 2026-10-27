@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SlumberWell – Sleep Stage Analysis</title>
+  <meta name="description" content="AI-powered sleep stage classification using EEG features. Powered by an Extra Trees model trained on the Sleep Cassette dataset."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Lucide icons via CDN -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="static/style.css"/>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </div>
+      <span class="logo-text">Slumber<span class="logo-accent">Well</span></span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" data-page="dashboard" onclick="navigate('dashboard')">
+        <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-btn" data-page="predict" onclick="navigate('predict')">
+        <span class="nav-icon"><i data-lucide="brain-circuit"></i></span>
+        <span class="nav-label">Predict</span>
+      </button>
+      <button class="nav-btn" data-page="metrics" onclick="navigate('metrics')">
+        <span class="nav-icon"><i data-lucide="bar-chart-2"></i></span>
+        <span class="nav-label">Model Metrics</span>
+      </button>
+      <button class="nav-btn" data-page="about" onclick="navigate('about')">
+        <span class="nav-icon"><i data-lucide="info"></i></span>
+        <span class="nav-label">About</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="api-status" id="apiStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sleep Dashboard</h1>
+          <p class="page-subtitle">Demo night analysis · Extra Trees model</p>
+        </div>
+        <button class="btn-primary" onclick="loadDemo()">
+          <i data-lucide="refresh-cw"></i> Refresh Demo
+        </button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card shimmer">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="clock"></i></span>
+            <div><div class="stat-label">Total Sleep Time</div><div class="stat-value" id="stat-tst">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card shimmer">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="percent"></i></span>
+            <div><div class="stat-label">Sleep Efficiency</div><div class="stat-value" id="stat-eff">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card shimmer">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="timer"></i></span>
+            <div><div class="stat-label">Sleep Onset Latency</div><div class="stat-value" id="stat-onset">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card shimmer">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="moon"></i></span>
+            <div><div class="stat-label">REM Latency</div><div class="stat-value" id="stat-rem">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card shimmer">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="film"></i></span>
+            <div><div class="stat-label">Total Recording</div><div class="stat-value" id="stat-rec">--</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-header">
+          <h2 class="card-title">Hypnogram</h2>
+          <div class="legend" id="hypnoLegend"></div>
+        </div>
+        <div class="chart-container" style="height:200px">
+          <canvas id="hypnoChart"></canvas>
+        </div>
+        <div class="recording-info" id="recordingInfo"></div>
+      </div>
+
+      <div class="two-col">
+        <div class="glass-card">
+          <h2 class="card-title">Stage Breakdown</h2>
+          <div class="chart-container" style="height:220px">
+            <canvas id="donutChart"></canvas>
+          </div>
+        </div>
+        <div class="glass-card">
+          <h2 class="card-title">Stage Duration</h2>
+          <div id="stageTable"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PREDICT -->
+    <section class="page" id="page-predict">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sleep Stage Predictor</h1>
+          <p class="page-subtitle">Enter 16 EEG features for a single 30-second epoch</p>
+        </div>
+        <button class="btn-secondary" onclick="fillRandom()">
+          <i data-lucide="shuffle"></i> Random Values
+        </button>
+      </div>
+
+      <div class="two-col">
+        <div class="glass-card">
+          <div class="section-heading">
+            <h2 class="card-title">EEG Epoch Features</h2>
+            <span class="badge">30-sec Epoch</span>
+          </div>
+
+          <div class="preset-strip">
+            <span class="preset-label"><i data-lucide="sparkles"></i> Quick Presets:</span>
+            <button class="preset-chip" onclick="loadPreset('W')">Wake (Awake)</button>
+            <button class="preset-chip" onclick="loadPreset('N2')">N2 (Light Sleep)</button>
+            <button class="preset-chip" onclick="loadPreset('N3')">N3 (Deep Sleep)</button>
+            <button class="preset-chip" onclick="loadPreset('REM')">REM (Dream)</button>
+          </div>
+
+          <div class="features-grid" id="featureInputs"></div>
+          <button class="btn-primary full-width mt-2" onclick="runPredict()">
+            <i data-lucide="zap"></i> Predict Sleep Stage
+          </button>
+        </div>
+
+        <div class="glass-card">
+          <h2 class="card-title">Prediction Result</h2>
+          <div id="predictResult" class="predict-placeholder">
+            <div class="placeholder-icon-wrap"><i data-lucide="activity"></i></div>
+            <p>Enter feature values and click Predict</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card mt-2">
+        <div class="card-header">
+          <h2 class="card-title">Batch Prediction (JSON)</h2>
+          <button class="btn-secondary btn-sm" onclick="loadDemoFeatures()">
+            <i data-lucide="file-json"></i> Load Demo Features
+          </button>
+        </div>
+        <p class="text-muted mb-1">Paste a JSON array of epoch feature arrays (each with 16 values):</p>
+        <textarea id="batchInput" class="code-input" rows="6" placeholder='[[0.1, 2.3, 5.3, 2.3, -5.0, 5.0, 10.0, 120.5, 30.2, 10.1, 8.5, 0.6, 0.15, 0.05, 0.04, 0.72]]'></textarea>
+        <button class="btn-primary mt-1" onclick="runBatch()">
+          <i data-lucide="layers"></i> Run Batch Prediction
+        </button>
+        <div id="batchResult" class="mt-1"></div>
+      </div>
+    </section>
+
+    <!-- METRICS -->
+    <section class="page" id="page-metrics">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Model Metrics</h1>
+          <p class="page-subtitle">Evaluation results for the selected Extra Trees model</p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="crosshair"></i></span>
+            <div><div class="stat-label">Macro F1 (Val)</div><div class="stat-value" id="m-val-f1">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="check-circle"></i></span>
+            <div><div class="stat-label">Accuracy (Test)</div><div class="stat-value" id="m-test-acc">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="ruler"></i></span>
+            <div><div class="stat-label">Macro F1 (Test)</div><div class="stat-value" id="m-test-f1">--</div></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-inner">
+            <span class="stat-icon-wrap"><i data-lucide="moon-star"></i></span>
+            <div><div class="stat-label">N1 Recall (Test)</div><div class="stat-value" id="m-n1-recall">--</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="glass-card">
+          <h2 class="card-title">Confusion Matrix — Test Set</h2>
+          <div id="confMatContainer"></div>
+        </div>
+        <div class="glass-card">
+          <h2 class="card-title">Per-Class Metrics — Test Set</h2>
+          <div id="perClassTable"></div>
+        </div>
+      </div>
+
+      <div class="glass-card mt-2">
+        <h2 class="card-title">Model Comparison — Validation Macro F1</h2>
+        <div class="chart-container" style="height:220px">
+          <canvas id="comparisonChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="page" id="page-about">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">About SlumberWell</h1>
+          <p class="page-subtitle">Phase 1 — ML Experimentation Summary</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="glass-card">
+          <div class="section-heading">
+            <i data-lucide="book-open"></i>
+            <h2 class="card-title">Project Overview</h2>
+          </div>
+          <p class="about-text">SlumberWell is an automatic sleep-stage classifier trained on the <strong>Sleep Cassette</strong> dataset from PhysioNet. A single EEG channel (Fpz-Cz) is used to extract 16 features per 30-second epoch, classified into five AASM sleep stages:</p>
+          <div class="stage-pills" id="stagePills"></div>
+          <p class="about-text mt-1">Phase 1 evaluated five classical ML models with hyperparameter tuning on a leave-one-subject-out split.</p>
+        </div>
+        <div class="glass-card">
+          <div class="section-heading">
+            <i data-lucide="git-branch"></i>
+            <h2 class="card-title">Signal Processing Pipeline</h2>
+          </div>
+          <div class="pipeline-steps" id="pipelineSteps"></div>
+        </div>
+      </div>
+
+      <div class="glass-card mt-2">
+        <div class="section-heading">
+          <i data-lucide="flask-conical"></i>
+          <h2 class="card-title">Features (16 per channel)</h2>
+        </div>
+        <div class="feature-chips" id="featureChips"></div>
+      </div>
+
+      <div class="glass-card mt-2">
+        <div class="section-heading">
+          <i data-lucide="trophy"></i>
+          <h2 class="card-title">Best Model Configuration</h2>
+        </div>
+        <div id="bestModelInfo"></div>
+      </div>
+
+      <div class="glass-card mt-2">
+        <div class="section-heading">
+          <i data-lucide="terminal"></i>
+          <h2 class="card-title">API Reference</h2>
+        </div>
+        <div class="api-table-container">
+          <table class="api-table">
+            <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/health</code></td><td>Health check</td></tr>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/info</code></td><td>Model info &amp; config</td></tr>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/metrics</code></td><td>Evaluation metrics</td></tr>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/metrics/comparison</code></td><td>Model comparison</td></tr>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/demo</code></td><td>Demo hypnogram</td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/predict</code></td><td>Single epoch prediction</td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/predict/batch</code></td><td>Batch prediction</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="about-text mt-1">Interactive docs at <a href="http://127.0.0.1:8000/docs" class="link" target="_blank">http://127.0.0.1:8000/docs</a></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="static/app.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

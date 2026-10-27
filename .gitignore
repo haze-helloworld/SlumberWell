@@ -1,0 +1,32 @@
+# Large datasets & raw recordings
+data/
+cache/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
