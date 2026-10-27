@@ -39,6 +39,8 @@ function navigate(page) {
 }
 
 // ── API health check ─────────────────────────────────────────────
+let activeModelName = "Support Vector Machine (SVM)";
+
 async function checkHealth() {
   const dot  = document.querySelector(".status-dot");
   const text = document.querySelector(".status-text");
@@ -47,6 +49,9 @@ async function checkHealth() {
     if (r.ok) {
       const d = await r.json();
       dot.classList.add("online");
+      if (d.model) {
+        activeModelName = d.model === "SVM" ? "Support Vector Machine (SVM)" : d.model;
+      }
       text.textContent = d.model || "Online";
     } else throw new Error();
   } catch {
@@ -104,9 +109,10 @@ function renderDashboard(d) {
   // Update subtitle with real subject info
   const sub = d.subject || "";
   const desc = d.description || "";
+  const modelLabel = activeModelName === "SVM" ? "Support Vector Machine (SVM)" : activeModelName;
   document.querySelector("#page-dashboard .page-subtitle").textContent =
-    sub ? `Subject ${sub} · ${(s.n_epochs||"?").toLocaleString()} epochs · Extra Trees model` :
-          "Demo night analysis · Extra Trees model";
+    sub ? `Subject ${sub} · ${(s.n_epochs||"?").toLocaleString()} epochs · ${modelLabel}` :
+          `Demo night analysis · ${modelLabel}`;
 
   // Stats cards
   el("stat-tst").textContent   = formatMins(s.total_sleep_min);
@@ -381,6 +387,11 @@ async function loadMetrics() {
 
 function renderMetrics(m, models) {
   const t = m.test;
+  const modLabel = m.model_name === "SVM" ? "Support Vector Machine (SVM)" : (m.model_name || activeModelName);
+  const metricsSubtitle = document.querySelector("#page-metrics .page-subtitle");
+  if (metricsSubtitle) {
+    metricsSubtitle.textContent = `Evaluation results for the selected ${modLabel} model`;
+  }
   el("m-val-f1").textContent  = (m.validation?.macro_f1_of_selection_run*100 || 0).toFixed(1)+"%";
   el("m-test-acc").textContent = (t.accuracy*100).toFixed(1)+"%";
   el("m-test-f1").textContent  = (t.macro_f1*100).toFixed(1)+"%";
@@ -470,11 +481,11 @@ async function loadAbout() {
   const steps = [
     ["1","Read EDF","Load single-channel EEG (Fpz-Cz) with MNE"],
     ["2","Resample","Resample to 100 Hz using polyphase filter"],
-    ["3","Bandpass Filter","4th-order Butterworth 0.5–40 Hz"],
+    ["3","Bandpass Filter","4th-order Butterworth 0.3–35 Hz"],
     ["4","Epoch","Cut into 30-second non-overlapping epochs"],
     ["5","Feature Extraction","Compute 16 statistical + spectral features"],
-    ["6","Hypnogram Labels","Align AASM annotations; exclude movement epochs"],
-    ["7","Classify","Extra Trees classifier (200 trees, max_depth=20)"],
+    ["6","Temporal Context","Append ±1 and ±2 epoch context (40 features total)"],
+    ["7","Classify","Support Vector Machine (RBF kernel, C=10, γ=0.01)"],
   ];
   el("pipelineSteps").innerHTML = steps.map(([n,t,d]) => `
     <div class="pipeline-step">
@@ -491,15 +502,22 @@ async function loadAbout() {
     const r = await fetch(`${API}/api/info`);
     const d = await r.json();
     const hp = d.hyperparameters || {};
-    const kvs = [
-      ["Model", d.model_name],
-      ["n_estimators", hp.n_estimators],
-      ["max_depth", hp.max_depth],
-      ["min_samples_leaf", hp.min_samples_leaf],
-      ["max_features", hp.max_features],
-      ["Val Macro F1", "70.4%"],
-      ["Inference / epoch", "< 0.05 ms"],
-      ["Training epochs", d.split?.n_epochs?.train || "—"],
+    const isSVM = (d.model_name || "").toUpperCase().includes("SVM");
+    const kvs = isSVM ? [
+      ["Model", "Support Vector Machine (SVM)"],
+      ["Kernel", "RBF"],
+      ["C (Regularization)", hp.svc__C ?? hp.C ?? "10"],
+      ["Gamma (γ)", hp.svc__gamma ?? hp.gamma ?? "0.01"],
+      ["Class Weight", "balanced"],
+      ["Features", `${(d.feature_names || []).length || 40} (16 base + temporal context)`],
+      ["Val Macro F1", "64.0%"],
+      ["Test Macro F1", "65.7%"],
+      ["Training Epochs", (d.split?.n_epochs?.train ? d.split.n_epochs.train.toLocaleString() : "133,512")],
+    ] : [
+      ["Model", d.model_name || "Classical ML"],
+      ["Val Macro F1", "64.0%"],
+      ["Features", `${(d.feature_names || []).length || 40}`],
+      ["Training Epochs", (d.split?.n_epochs?.train ? d.split.n_epochs.train.toLocaleString() : "—")],
     ];
     el("bestModelInfo").innerHTML = `<div class="kv-grid">${kvs.map(([k,v]) =>
       `<div class="kv-item"><div class="kv-key">${k}</div><div class="kv-val">${v}</div></div>`
